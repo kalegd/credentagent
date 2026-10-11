@@ -7,6 +7,23 @@
 
 import { age, payment, membership } from "./credentials.js";
 import type { OrderDoor } from "./orders.js";
+import { CredentAgent } from "./client.js";
+import type { IssuerTrustOptions } from "./index.js";
+
+const issuerTrust: IssuerTrustOptions = {
+  trustedIssuerCertificates: [{ data: "PEM", trust_scopes: ["government_issued_id"] }],
+  trustLists: ["aamva_dts", "uv"],
+  trustScope: "government_issued_id",
+  revocationCheckMode: "required",
+  timeout: 1000,
+  cacheEnabled: false,
+  cacheTTL: 1000,
+};
+new CredentAgent({ issuerTrust });
+// @ts-expect-error — the SDK's trust-list literals are part of the configuration contract
+new CredentAgent({ issuerTrust: { trustLists: ["unknown-list"] } });
+// @ts-expect-error — unsupported CRL modes must not silently disable the configured policy
+new CredentAgent({ issuerTrust: { revocationCheckMode: "ignore" } });
 
 // age has only `.over()` (+ `.when()`), never `.in()`:
 // @ts-expect-error — age.over(...) returns a Credential with no `.in`

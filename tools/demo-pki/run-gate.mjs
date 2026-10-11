@@ -4,10 +4,11 @@
 // It IS the quickstart (examples/quickstart/server.mjs): the REAL storefront reference
 // consumer — createStorefront() + CredentAgent.mount() + store.gate(policy) — so the
 // checkout page, place-order, cart mandate, completion and MCP tools are the actual
-// library code, not a hand-rolled copy. It adds exactly two things:
+// library code, not a hand-rolled copy. It adds three things:
 //   1. the demo reader identity (optional; #51) so a wallet holding utopia.rical trusts
-//      the verifier, and
-//   2. ONE seeded order (ORD-DEMO) so a single browser link opens the real storefront
+//      the verifier,
+//   2. DSC certificate trust against the demo IACA, and
+//   3. ONE seeded order (ORD-DEMO) so a single browser link opens the real storefront
 //      checkout without needing an MCP agent to mint an order first.
 //
 //   (cd packages/credentagent-gate && npm run build)          # once
@@ -44,8 +45,16 @@ const createdOrderStore = { read: async (id) => orders.get(id) ?? null, write: a
 const store = createStorefront({ createdOrderStore, baseUrl: BASE, signingKey: "demo-gate-secret" });
 
 // Wire the /credentagent/* ceremony rails onto the storefront's server, with the demo
-// reader identity threaded through.
-const credentagent = new CredentAgent({ walletOrigin: BASE, ...(readerIdentity ? { readerIdentity } : {}) });
+// reader identity and local issuer trust threaded through.
+const credentagent = new CredentAgent({
+  walletOrigin: BASE,
+  ...(readerIdentity ? { readerIdentity } : {}),
+  issuerTrust: {
+    trustedIssuerCertificates: [readFileSync(join(HERE, "certs/iaca-cert.pem"), "utf8")],
+    trustLists: [],
+    revocationCheckMode: "skip",
+  },
+});
 credentagent.mount(store.app);
 
 // A CUSTOM gate — any credential drops into the same policy and now renders CONSISTENTLY

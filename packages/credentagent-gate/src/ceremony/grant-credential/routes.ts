@@ -227,13 +227,13 @@ export function registerGrantCredentialGate(app: CredentialRailApp, grants: Gran
               res.status(400).json({ verified: false, error: "missing mdocContextToken for org-iso-mdoc" });
               return;
             }
-            out = await verifyMdocPresentation({ kind: cred, result, mdocContextToken: body.mdocContextToken, origin: originOf(req), secret: cfg.secret, minimumAge, percent });
+            out = await verifyMdocPresentation({ kind: cred, result, mdocContextToken: body.mdocContextToken, origin: originOf(req), secret: cfg.secret, minimumAge, percent, issuerTrust: cfg.issuerTrust });
           } else {
             if (typeof body.readerContextToken !== "string") {
               res.status(400).json({ verified: false, error: "missing readerContextToken for openid4vp presentation" });
               return;
             }
-            out = await verifyCredentialPresentation({ kind: cred, result, readerContextToken: body.readerContextToken, secret: cfg.secret, minimumAge, percent });
+            out = await verifyCredentialPresentation({ kind: cred, result, readerContextToken: body.readerContextToken, secret: cfg.secret, minimumAge, percent, issuerTrust: cfg.issuerTrust });
           }
         } else {
           // Instant-demo claims path (the tested default).

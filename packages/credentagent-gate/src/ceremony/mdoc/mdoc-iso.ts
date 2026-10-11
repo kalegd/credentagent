@@ -43,6 +43,7 @@ import * as jose from "jose";
 import * as x509 from "@peculiar/x509";
 import { decodeVpToken, type DisclosedEntry } from "./mdoc.js";
 import type { ReaderIdentity } from "../../types.js";
+import type { ReaderContext } from "./readerContext.js";
 
 x509.cryptoProvider.set(globalThis.crypto);
 const READER_SIGN_ALG = { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" } as const;
@@ -279,6 +280,15 @@ export function buildSessionTranscript(base64EncryptionInfo: string, origin: str
   const digest = createHash("sha256").update(cborEncode(dcapiInfo)).digest();
   const transcript = [null, null, ["dcapi", digest]];
   return cborEncode(transcript);
+}
+
+/** OpenID4VP 1.0 B.2.6.2: origin, nonce and response-encryption JWK thumbprint.
+ *  Older reader contexts lack the origin; constructing a transcript verifies nothing. */
+export async function buildOpenId4VpSessionTranscript(ctx: ReaderContext): Promise<Uint8Array | undefined> {
+  if (!ctx.origin || !ctx.nonce) return undefined;
+  const thumbprint = Buffer.from(await jose.calculateJwkThumbprint(ctx.ecdhPrivateJwk), "base64url");
+  const digest = createHash("sha256").update(cborEncode([ctx.origin, ctx.nonce, thumbprint])).digest();
+  return cborEncode([null, null, ["OpenID4VPDCAPIHandover", digest]]);
 }
 
 // ── Assemble the request `data` for navigator.credentials.get ─────────────────

@@ -29,6 +29,7 @@ import type { IntentBoundsInput } from "./ceremony/intent-sign/bounds.js";
 import type { Branding, ReaderIdentity, TrustLevel } from "./types.js";
 import { AmountError, toMinorUnits } from "./ap2/money.js";
 import { importVerifyKey } from "./ap2/keys.js";
+import type { DscTrustResolver } from "./ceremony/mdoc/issuer-trust.js";
 
 /** Why a grant operation refused — a TYPED union (never `string`; #95 review). */
 export type GrantDoorCode =
@@ -275,6 +276,8 @@ export interface GrantsDeps {
   signingKey?: string;
   /** Stable reader identity the intent-sign request presents (absent ⇒ per-request self-signed). */
   readerIdentity?: ReaderIdentity;
+  /** Shared preparatory DSC trust resolver for the grant credential ceremonies. */
+  issuerTrust?: DscTrustResolver;
   /** Host brand for the signing page (absent ⇒ the built-in look; never brands the trust line). */
   branding?: Branding;
   /** Your loyalty programme's discount, as a percentage (e.g. `10`). Setting it OPTS IN: the
@@ -384,12 +387,13 @@ export class Grants {
   /** Config the rails `grants.serve(app)` registers read — the intent-sign rail (spec 012) and
    *  the grant-credential rail (#172). One object, so a page and its ceremonies can never be
    *  configured differently. */
-  get railConfig(): { walletOrigin: string; secret: string; readerIdentity?: ReaderIdentity; branding?: Branding; loyaltyDiscountPct?: number } {
+  get railConfig(): { walletOrigin: string; secret: string; readerIdentity?: ReaderIdentity; issuerTrust?: DscTrustResolver; branding?: Branding; loyaltyDiscountPct?: number } {
     const loyaltyDiscountPct = this._loyaltyDiscountPct;
     return {
       walletOrigin: this.deps.walletOrigin,
       secret: this.signingSecret,
       ...(this.deps.readerIdentity ? { readerIdentity: this.deps.readerIdentity } : {}),
+      ...(this.deps.issuerTrust ? { issuerTrust: this.deps.issuerTrust } : {}),
       ...(this.deps.branding ? { branding: this.deps.branding } : {}),
       ...(loyaltyDiscountPct != null ? { loyaltyDiscountPct } : {}),
     };

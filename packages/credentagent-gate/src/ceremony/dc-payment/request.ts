@@ -61,7 +61,7 @@ export async function buildDcPaymentRequest(order: CeremonyOrder, origin: Origin
     .setIssuedAt()
     .sign(privateKey as unknown as Parameters<InstanceType<typeof jose.SignJWT>["sign"]>[0]);
 
-  const readerContextToken = await sealReaderContext({ ecdhPrivateJwk, transactionDataB64: txDataB64, nonce }, secret);
+  const readerContextToken = await sealReaderContext({ ecdhPrivateJwk, transactionDataB64: txDataB64, nonce, origin: origin.origin }, secret);
   return {
     protocol: "openid4vp-v1-signed",
     request,

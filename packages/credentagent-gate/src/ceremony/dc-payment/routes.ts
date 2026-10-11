@@ -143,7 +143,7 @@ export const registerDcPaymentGate: RailRegistrar = (app: CeremonyApp, ctx: Cere
           res.status(400).json({ completed: false, error: "missing readerContextToken for openid4vp presentation" });
           return;
         }
-        const out = await verifyDcPresentation({ order, origin, result, readerContextToken: body.readerContextToken, secret: ctx.signingKey });
+        const out = await verifyDcPresentation({ order, origin, result, readerContextToken: body.readerContextToken, secret: ctx.signingKey, issuerTrust: ctx.issuerTrust });
         mandate = out.mandate;
         gates = out.gates;
       } else {

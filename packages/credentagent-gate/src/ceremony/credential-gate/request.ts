@@ -78,6 +78,6 @@ export async function buildSignedRequestForDcql(
 
   // Seal the nonce alongside the decryption key so /verify can require the wallet's
   // response to be bound to THIS request (apu/apv check), not just decrypt.
-  const readerContextToken = await sealReaderContext({ ecdhPrivateJwk, transactionDataB64: "", nonce }, secret);
+  const readerContextToken = await sealReaderContext({ ecdhPrivateJwk, transactionDataB64: "", nonce, origin: origin.origin }, secret);
   return { protocol: "openid4vp-v1-signed", request, dcql_query: dcql, readerContextToken, trust_level: "presence-only-demo" };
 }

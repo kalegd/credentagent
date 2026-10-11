@@ -88,6 +88,29 @@ credentagent.mount(store.app); // every /credentagent/* page now carries ACME's 
   `https:`/`http:` URL, or a root-relative `/path`. A host-supplied string can't inject markup or CSS
   onto a consent screen.
 
+### DSC certificate trust (`issuerTrust`)
+
+Set `issuerTrust` once to check Document Signer Certificate (DSC) trust on the mdoc
+credential and payment rails, including grant credentials.
+Certificate trust does not yet affect acceptance or `trust_level`.
+
+```ts
+const credentagent = new CredentAgent({
+  walletOrigin,
+  issuerTrust: {
+    trustedIssuerCertificates: [iacaPem], // PEM-encoded IACA certificate
+    trustLists: [], // local anchors only
+  },
+});
+```
+
+Omitting `issuerTrust` disables checking. Empty `trustLists` and skipped CRL checks (both defaults)
+allow offline operation. Set `trustLists: ["aamva_dts", "uv"]` to query the registry; enabling CRL
+checks can also make network requests.
+
+For scope, CRL, timeout and cache settings, `IssuerTrustOptions` accepts the
+[`trusted-issuer-registry` 0.2.2](https://github.com/universal-verify/trusted-issuer-registry/tree/0.2.2#registry) options.
+
 ### Inspecting what the wallet sent (`inspectPresentations`)
 
 Want to see the actual verifiable credential behind a proof — while you develop, or to show a
@@ -924,7 +947,7 @@ provide those are later increments.
 ```ts
 // Client (configure once, then declarative calls)
 class CredentAgent {
-  constructor(opts?: { walletOrigin?: string; store?: VerificationStore; credentials?: Credential[]; branding?: Branding; inspectPresentations?: boolean });
+  constructor(opts?: { walletOrigin?: string; store?: VerificationStore; credentials?: Credential[]; branding?: Branding; inspectPresentations?: boolean; issuerTrust?: IssuerTrustOptions });
   requirements(order: GateOrder, policy: Step[]): VerificationManifestEntry[];   // Context 1
   mount(app: ExpressApp, ceremony?: MountCeremony): void;                        // Context 2
   doctor(opts?: { print?: boolean }): DoctorReport;                              // config preflight (#25)

@@ -291,13 +291,13 @@ export const registerCredentialGate: RailRegistrar = (app: CeremonyApp, ctx: Cer
             res.status(400).json({ verified: false, error: "missing mdocContextToken for org-iso-mdoc" });
             return;
           }
-          out = await verifyMdocPresentation({ kind, result, mdocContextToken: body.mdocContextToken, origin: originOf(ctx, req), secret: ctx.signingKey, minimumAge, percent, credential });
+          out = await verifyMdocPresentation({ kind, result, mdocContextToken: body.mdocContextToken, origin: originOf(ctx, req), secret: ctx.signingKey, minimumAge, percent, credential, issuerTrust: ctx.issuerTrust });
         } else {
           if (typeof body.readerContextToken !== "string") {
             res.status(400).json({ verified: false, error: "missing readerContextToken for openid4vp presentation" });
             return;
           }
-          out = await verifyCredentialPresentation({ kind, result, readerContextToken: body.readerContextToken, secret: ctx.signingKey, minimumAge, percent, credential });
+          out = await verifyCredentialPresentation({ kind, result, readerContextToken: body.readerContextToken, secret: ctx.signingKey, minimumAge, percent, credential, issuerTrust: ctx.issuerTrust });
         }
       } else {
         // Instant-demo claims path (the tested default).

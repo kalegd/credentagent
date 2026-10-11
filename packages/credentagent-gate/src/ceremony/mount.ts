@@ -25,6 +25,7 @@ import { registerCredentialGate } from "./credential-gate/routes.js";
 import { registerPasskeyGate } from "./passkey/routes.js";
 import { registerDcPaymentGate } from "./dc-payment/routes.js";
 import { registerDelegatedPaymentGate } from "./delegated-payment/routes.js";
+import type { DscTrustResolver } from "./mdoc/issuer-trust.js";
 
 /** Minimal Express-app shape mount() needs (no `express` dependency). */
 export interface CeremonyApp {
@@ -72,6 +73,8 @@ export interface CeremonySeams {
    *  the wallet's "unknown verifier" warning). Absent ⇒ per-request self-signed
    *  reader (presence-only). Normally set once on `new CredentAgent({ readerIdentity })`. */
   readerIdentity?: ReaderIdentity;
+  /** Preparatory DSC trust resolver, normally created once by CredentAgent. */
+  issuerTrust?: DscTrustResolver;
   /** The gate's in-process credential registry (id → Credential), populated by
    *  `requirements()` and passed here by `CredentAgent.mount()` (007). The rails read
    *  it to serve a custom credential's own request/verify; it is re-published on
@@ -127,6 +130,8 @@ export interface CeremonyContext {
   statelessOrders?: boolean;
   /** Stable reader identity the rails present (absent ⇒ per-request self-signed). */
   readerIdentity?: ReaderIdentity;
+  /** Shared DSC trust resolver; its results do not yet affect verification outputs. */
+  issuerTrust?: DscTrustResolver;
   /** The gate's credential registry (007) — the rails read it to serve a custom
    *  credential's own request/verify. Absent when no CredentAgent registry was passed. */
   credentialRegistry?: ReadonlyMap<string, Credential>;
@@ -175,6 +180,7 @@ export function mountCeremony(app: CeremonyApp, options: Partial<CeremonySeams> 
   const allowEphemeralKey = options.allowEphemeralKey ?? locals.allowEphemeralKey ?? false;
   const statelessOrders = options.statelessOrders ?? locals.statelessOrders ?? false;
   const readerIdentity = options.readerIdentity ?? locals.readerIdentity;
+  const issuerTrust = options.issuerTrust ?? locals.issuerTrust;
   const credentialRegistry = options.credentialRegistry ?? locals.credentialRegistry;
   const orderPolicies = options.orderPolicies ?? locals.orderPolicies;
   const returnUrl = options.returnUrl ?? locals.returnUrl;
@@ -240,6 +246,7 @@ export function mountCeremony(app: CeremonyApp, options: Partial<CeremonySeams> 
     ...(settlement ? { settlement } : {}),
     ...(verifier ? { verifier } : {}),
     ...(readerIdentity ? { readerIdentity } : {}),
+    ...(issuerTrust ? { issuerTrust } : {}),
     ...(returnUrl ? { returnUrl } : {}),
     ...(statusUrl ? { statusUrl } : {}),
     ...(branding ? { branding } : {}),

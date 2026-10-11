@@ -16,6 +16,7 @@ import { runDoctor, formatDoctorReport, type DoctorReport } from "./doctor.js";
 import { CHECKOUT_KEY_FRAGMENT, didDocument, resolveSigningKey, type GateSigningKey } from "./ap2/keys.js";
 import { Ap2Issuer } from "./ap2/issue.js";
 import { merchantFor } from "./ap2/from-gate.js";
+import { createIssuerTrustResolver, type DscTrustResolver } from "./ceremony/mdoc/issuer-trust.js";
 
 x509.cryptoProvider.set(globalThis.crypto);
 
@@ -57,6 +58,7 @@ export class CredentAgent {
   /** Whether verify responses + consent pages expose the presented DeviceResponse for
    *  inspection (`inspectPresentations`; default false). Threaded into every rail mount. */
   readonly inspectPresentations: boolean;
+  private readonly issuerTrust?: DscTrustResolver;
   private readonly listeners = new Map<string, Set<(payload: { id: string }) => void>>();
   // True once the ceremony rails are wired onto a host app (so `/credentagent/*` routes
   // exist on this server). `requirements()` then emits approve links that resolve
@@ -144,6 +146,7 @@ export class CredentAgent {
     this.sharedVerificationStore = opts.store !== undefined && !(opts.store instanceof MemoryVerificationStore);
     this.hasGateSecret = typeof opts.gateSecret === "string" && opts.gateSecret.length > 0;
     this.readerIdentity = opts.readerIdentity;
+    this.issuerTrust = createIssuerTrustResolver(opts.issuerTrust);
     // Host brand for the ceremony pages — threaded into every mount path below. Kept raw;
     // theme.ts sanitizes each field at the one point it is interpolated into a page.
     if (opts.branding) this.branding = opts.branding;
@@ -181,6 +184,7 @@ export class CredentAgent {
       ...(opts.catalog ? { catalog: opts.catalog } : {}),
       ...(opts.gateSecret ? { signingKey: opts.gateSecret } : {}),
       ...(opts.readerIdentity ? { readerIdentity: opts.readerIdentity } : {}),
+      ...(this.issuerTrust ? { issuerTrust: this.issuerTrust } : {}),
       ...(opts.branding ? { branding: opts.branding } : {}),
       ...(opts.loyaltyDiscountPct != null ? { loyaltyDiscountPct: opts.loyaltyDiscountPct } : {}),
     });
@@ -203,6 +207,7 @@ export class CredentAgent {
           verificationStore: this.store,
           credentialRegistry: this.registry,
           ...(this.readerIdentity ? { readerIdentity: this.readerIdentity } : {}),
+          ...(this.issuerTrust ? { issuerTrust: this.issuerTrust } : {}),
           ...(this.branding ? { branding: this.branding } : {}),
           ...(this.inspectPresentations ? { inspectPresentations: true } : {}),
           ...(opts.gateSecret ? { signingKey: opts.gateSecret } : {}),
@@ -340,7 +345,7 @@ export class CredentAgent {
     // fetch on the other two, and every mandate this gate signed would be uncheckable there.
     this.publishSigningKey(app);
     if (ceremony) {
-      mountCeremony(app as CeremonyApp, { ...this.basePathSeam(), ...ceremony, verificationStore: this.store, readerIdentity: this.readerIdentity, credentialRegistry: this.registry, orderPolicies: this.orderPolicies, ...(this.branding ? { branding: this.branding } : {}), ...(this.inspectPresentations ? { inspectPresentations: true } : {}) });
+      mountCeremony(app as CeremonyApp, { ...this.basePathSeam(), ...ceremony, verificationStore: this.store, readerIdentity: this.readerIdentity, ...(this.issuerTrust ? { issuerTrust: this.issuerTrust } : {}), credentialRegistry: this.registry, orderPolicies: this.orderPolicies, ...(this.branding ? { branding: this.branding } : {}), ...(this.inspectPresentations ? { inspectPresentations: true } : {}) });
       this.mountedRoutes = true;
       if (ceremony.verifier) this.delegated = true;
       // #25 doctor(): a host owns the serving surface here; capture the signing key it supplied via
@@ -356,7 +361,7 @@ export class CredentAgent {
     // rails write (invariant 4). Falls back to CredentAgent's own store otherwise.
     const locals = (app.locals.credentagent ?? {}) as Partial<CeremonySeams>;
     if (locals.orderStore && locals.catalog && locals.completion) {
-      mountCeremony(app as CeremonyApp, { ...this.basePathSeam(), readerIdentity: this.readerIdentity, credentialRegistry: this.registry, orderPolicies: this.orderPolicies, ...(this.branding ? { branding: this.branding } : {}), ...(this.inspectPresentations ? { inspectPresentations: true } : {}), ...(locals.verificationStore ? {} : { verificationStore: this.store }) });
+      mountCeremony(app as CeremonyApp, { ...this.basePathSeam(), readerIdentity: this.readerIdentity, ...(this.issuerTrust ? { issuerTrust: this.issuerTrust } : {}), credentialRegistry: this.registry, orderPolicies: this.orderPolicies, ...(this.branding ? { branding: this.branding } : {}), ...(this.inspectPresentations ? { inspectPresentations: true } : {}), ...(locals.verificationStore ? {} : { verificationStore: this.store }) });
       this.mountedRoutes = true;
       // The host published a verifier on app.locals (createStorefront({ verifier })): route the
       // manifest's gate/authorize links to the delegated ceremony (008).

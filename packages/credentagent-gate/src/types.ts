@@ -9,6 +9,7 @@ import type { OrderStore, CreatedOrder, CompletedOrder } from "./orders.js";
 import type { PrivateJwkP256 } from "./ap2/keys.js";
 import type { WebhookOptions } from "./webhooks.js";
 import type { CatalogEntry } from "./delegated.js";
+import type { RegistryOptions, ResolveCertificateTrustOptions } from "trusted-issuer-registry";
 
 // ── DCQL (what to ask the wallet) ──────────────────────────────────────────
 
@@ -252,6 +253,9 @@ export interface Branding {
   demoPill?: boolean;
 }
 
+/** Configure DSC certificate trust with the SDK's own source, scope, CRL and cache options. */
+export type IssuerTrustOptions = RegistryOptions & ResolveCertificateTrustOptions;
+
 export interface CredentAgentOptions {
   /**
    * Absolute origin the wallet ceremony binds to (e.g. `https://shop.example`).
@@ -294,6 +298,12 @@ export interface CredentAgentOptions {
    * self-signs an ephemeral reader cert per request (`presence-only-demo`).
    */
   readerIdentity?: ReaderIdentity;
+  /**
+   * Optional preparatory DSC certificate-trust checking on the mdoc wallet paths.
+   * Defaults to local anchors only, with CRL checks skipped. Results stay internal
+   * until full document verification lands (#14); outputs and acceptance are unchanged.
+   */
+  issuerTrust?: IssuerTrustOptions;
   /**
    * Custom credentials to register at construction, so EVERY instance can enforce them
    * from boot — independent of whether `requirements()` ran on this instance (007 / item 5).

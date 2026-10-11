@@ -261,6 +261,7 @@ export type { Origin, RequestLike } from "./ceremony/origin.js";
 // ── Public types ───────────────────────────────────────────────────────────
 export type {
   CredentAgentOptions,
+  IssuerTrustOptions,
   Branding,
   ReaderIdentity,
   GateOrder,

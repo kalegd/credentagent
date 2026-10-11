@@ -24,7 +24,16 @@ import type { CeremonyOrder } from "../types.js";
 import type { Origin } from "../origin.js";
 import { buildTransactionData, decodeTransactionData, encodeTransactionData, hashTransactionData, txHashNameFromCose } from "./txData.js";
 import { openReaderContext } from "../mdoc/readerContext.js";
-import { decodeVpToken, extractTransactionDataHash, extractTransactionDataHashAlg, inspectAuthBlocks } from "../mdoc/mdoc.js";
+import {
+  extractTransactionDataHash,
+  extractTransactionDataHashAlg,
+  inspectAuthBlocks,
+  type DeviceResponse,
+  type DisclosedEntry,
+} from "../mdoc/mdoc.js";
+import type { DscTrustResolver } from "../mdoc/issuer-trust.js";
+import { verifyMdocDeviceResponse } from "../mdoc/verification.js";
+import { buildOpenId4VpSessionTranscript } from "../mdoc/mdoc-iso.js";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -223,8 +232,7 @@ export function runDcGates(mandate: DcMandate, origin: Origin, opts: { loyaltyDi
 
 // ── REAL OpenID4VP path ───────────────────────────────────────────────────────
 // Disclosed mdoc claim values can be {_tag, value} (e.g. tag-1004 dates) or raw.
-function disclosedClaims(vpStr: string): Record<string, unknown> {
-  const disclosed = decodeVpToken({ dpc: vpStr });
+function disclosedClaims(disclosed: DisclosedEntry[]): Record<string, unknown> {
   return Object.fromEntries((disclosed[0]?.claims ?? []).map((c) => [c.label.split(" / ").pop()!, c.value]));
 }
 
@@ -241,11 +249,12 @@ export function buildDcMandateFromPresentation(args: {
   vpStr: string;
   transactionDataB64: string;
   issuer?: string;
+  presentation: { response: DeviceResponse; disclosed: DisclosedEntry[] };
 }): DcMandate {
   const { order, vpStr, transactionDataB64 } = args;
   const now = new Date();
   const expires = new Date(now.getTime() + 5 * 60_000);
-  const claims = disclosedClaims(vpStr);
+  const claims = disclosedClaims(args.presentation.disclosed);
   const instrument: DcInstrument = {
     issuer: claimText(claims["issuer_name"]),
     instrumentId: claimText(claims["payment_instrument_id"]),
@@ -253,7 +262,8 @@ export function buildDcMandateFromPresentation(args: {
     holder: claimText(claims["holder_name"]),
     expiry: claimText(claims["expiry_date"]),
   };
-  const blocks = inspectAuthBlocks(vpStr);
+  const parsed = args.presentation.response;
+  const blocks = inspectAuthBlocks(parsed);
   return {
     type: "ap2.PaymentMandate",
     version: "0.1-dc-demo",
@@ -268,9 +278,9 @@ export function buildDcMandateFromPresentation(args: {
       type: "openid4vp-dc-api",
       transactionData: transactionDataB64,
       // The wallet's signed hash — re-checked in Gate 1 against our recomputed hash.
-      transactionDataHash: extractTransactionDataHash(vpStr),
+      transactionDataHash: extractTransactionDataHash(parsed),
       // The algorithm the wallet used, so Gate 1 recomputes with it (null ⇒ SHA-256).
-      transactionDataHashAlg: extractTransactionDataHashAlg(vpStr),
+      transactionDataHashAlg: extractTransactionDataHashAlg(parsed),
       presented: true,
       vpToken: vpStr,
       authBlocks: { hasIssuerAuth: blocks.hasIssuerAuth, hasDeviceAuth: blocks.hasDeviceAuth },
@@ -298,6 +308,7 @@ export async function verifyDcPresentation(args: {
   result: { protocol?: string; data?: unknown };
   readerContextToken: string;
   secret: string;
+  issuerTrust?: DscTrustResolver;
 }): Promise<DcVerification> {
   const { order, origin, result, readerContextToken, secret } = args;
   const ctx = await openReaderContext(readerContextToken, secret);
@@ -316,7 +327,14 @@ export async function verifyDcPresentation(args: {
   const vpStr: string | undefined = Array.isArray(vpToken?.dpc) ? (vpToken!.dpc[0] as string) : (vpToken?.dpc as string | undefined);
   if (!vpStr) throw new Error("no vp_token.dpc in decrypted response");
 
-  const mandate = buildDcMandateFromPresentation({ order, vpStr, transactionDataB64: ctx.transactionDataB64 });
+  const verification = await verifyMdocDeviceResponse(vpStr, {
+    issuerTrust: args.issuerTrust,
+    sessionTranscript: await buildOpenId4VpSessionTranscript(ctx),
+  }, "dpc");
+  const mandate = buildDcMandateFromPresentation({ order, vpStr, transactionDataB64: ctx.transactionDataB64, presentation: verification });
   const gates = runDcGates(mandate, origin);
+  // TODO(#14): once issuer signatures, digests, MSO validity and device authentication
+  // are implemented, combine their results with DSC trust to determine mandate.trust_level.
+  void verification.documents;
   return { mandate, gates };
 }

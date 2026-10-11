@@ -18,6 +18,8 @@ export interface ReaderContext {
   // Request nonce, sealed so /verify can check the wallet's response is bound
   // to THIS request (credential gate; the payment gate also binds via transaction_data).
   nonce?: string;
+  /** Original request origin, sealed for the OpenID4VP device-authentication transcript. */
+  origin?: string;
   // Intent-sign rail (spec 012): the grant this ceremony signs + the bounds it was
   // sealed for. /verify re-derives boundsHash from the SERVER's grant record and
   // requires it to equal `boundsHash` (FR-2 equality check), and re-derives the nonce
@@ -52,6 +54,7 @@ export async function openReaderContext(token: string, secret: string): Promise<
     ecdhPrivateJwk: payload.ecdhPrivateJwk,
     transactionDataB64: payload.transactionDataB64,
     nonce: payload.nonce,
+    origin: payload.origin,
     grantId: payload.grantId,
     challenge: payload.challenge,
     boundsHash: payload.boundsHash,

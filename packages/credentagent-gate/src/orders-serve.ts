@@ -32,6 +32,7 @@ import type {
   VerificationStore,
 } from "./types.js";
 import type { CompletedOrder, CreatedOrder, OrderStore } from "./orders.js";
+import type { DscTrustResolver } from "./ceremony/mdoc/issuer-trust.js";
 
 /** What `orders.serve(app)` needs from the client to wire the checkout. */
 export interface ServeOrdersDeps {
@@ -50,6 +51,8 @@ export interface ServeOrdersDeps {
   credentialRegistry: ReadonlyMap<string, Credential>;
   /** Stable reader identity the rails present (omit ⇒ per-request self-signed). */
   readerIdentity?: ReaderIdentity;
+  /** Shared preparatory DSC trust resolver for the credential and payment rails. */
+  issuerTrust?: DscTrustResolver;
   /** Host brand for the checkout page + rails (omit ⇒ the built-in look). Never brands the footer. */
   branding?: Branding;
   /** Return the presented DeviceResponse to the rail page for inspection (omit ⇒ off). */
@@ -216,6 +219,7 @@ export function serveOrders(app: CeremonyApp, deps: ServeOrdersDeps): void {
     // The pay pages link this order's status record ("Order record ›") — same host as the pages.
     statusUrl: (id) => `${basePathOf(deps.walletOrigin)}/credentagent/orders/${encodeURIComponent(id)}/status`,
     ...(deps.readerIdentity ? { readerIdentity: deps.readerIdentity } : {}),
+    ...(deps.issuerTrust ? { issuerTrust: deps.issuerTrust } : {}),
     ...(deps.branding ? { branding: deps.branding } : {}),
     ...(deps.inspectPresentations ? { inspectPresentations: true } : {}),
     ...(deps.signingKey ? { signingKey: deps.signingKey } : { allowEphemeralKey: true }),

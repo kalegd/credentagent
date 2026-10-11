@@ -13,11 +13,12 @@ import { evaluateDisclosed, evaluateDisclosedCustom, type PresentationResult } f
 import type { Credential } from "../../types.js";
 import type { CredentialKind } from "./dcql.js";
 import { mdocDocSpec } from "./doc-spec.js";
+import type { DscTrustResolver } from "../mdoc/issuer-trust.js";
+import { verifyMdocDeviceResponse } from "../mdoc/verification.js";
 import {
   openMdocContext,
   buildSessionTranscript,
   decryptDeviceResponse,
-  disclosedFromDeviceResponse,
 } from "../mdoc/mdoc-iso.js";
 
 export async function verifyMdocPresentation(args: {
@@ -31,6 +32,7 @@ export async function verifyMdocPresentation(args: {
   /** Custom credential (007): when present, its OWN `verify` runs on the disclosed
    *  claims instead of the built-in age/membership policy. */
   credential?: Credential;
+  issuerTrust?: DscTrustResolver;
 }): Promise<PresentationResult> {
   const { kind, result, mdocContextToken, origin, secret, minimumAge, percent, credential } = args;
   const ctx = await openMdocContext(mdocContextToken, secret);
@@ -50,7 +52,11 @@ export async function verifyMdocPresentation(args: {
     readerPrivateJwk: ctx.readerPrivateJwk,
     sessionTranscript,
   });
-  const disclosed = disclosedFromDeviceResponse(deviceResponse);
+  const verification = await verifyMdocDeviceResponse(deviceResponse, { sessionTranscript, issuerTrust: args.issuerTrust });
+  const disclosed = verification.disclosed;
+  // TODO(#14): once issuer signatures, digests, MSO validity and device authentication
+  // are implemented, combine their results with DSC trust to determine trust_level.
+  void verification.documents;
   // The DeviceResponse the decision was made on (base64url) — returned to the page only
   // when the host opted in to inspectPresentations.
   const presented = { deviceResponse: Buffer.from(deviceResponse).toString("base64url") };
